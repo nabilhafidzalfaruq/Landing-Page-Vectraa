@@ -21,4 +21,4 @@ const firebaseAuth = firebase.auth();
 // Paste the matching adapter code from code-gs-adapter.gs into your Code.gs first.
 // ---------------------------------------------------------------------------
 const GAS_API_URL =
-  "https://script.google.com/macros/s/AKfycbz1mrUbm-VKoMSxFOiKwukRRqU0s_0qwXqkIOwTQCTysd8XZxcMYWfR56bClxE0xSKF/exec";
+  "https://script.google.com/macros/s/AKfycbz6FI-obBlruiSCGj1D19HZsfzA-McG_ycPtTFFzssvtv8HIsvo4CJLzdS43DDN417A/exec";
