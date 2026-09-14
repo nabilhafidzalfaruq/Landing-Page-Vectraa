@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#081f3f">
+  <title>VECTRA Competition Portal 2026</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+  <div id="loading" class="loading hidden"><div class="spinner"></div><span>Memproses...</span></div>
+
+  <header class="nav-wrap" id="topNav">
+    <nav class="nav container">
+      <button class="brand" onclick="goHome()" aria-label="Beranda VECTRA">
+        <span class="brand-mark" id="brandMark">V</span>
+        <span><b>VECTRA</b><small>Competition Portal 2026</small></span>
+      </button>
+      <div class="nav-links">
+        <button onclick="openPublicSection('kompetisi')">Kompetisi</button>
+        <button onclick="openPublicSection('alur')">Alur</button>
+        <button onclick="openPublicSection('tentang')">Tentang</button>
+        <button onclick="openPublicSection('faq')">FAQ</button>
+      </div>
+      <div class="nav-actions" id="navActions">
+        <button class="btn ghost" onclick="openAuth('login')">Masuk</button>
+        <button class="btn primary" onclick="openAuth('register')">Buat Akun</button>
+      </div>
+      <button class="mobile-menu" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+    </nav>
+    <div class="mobile-links hidden" id="mobileLinks">
+      <button onclick="openPublicSection('kompetisi')">Kompetisi</button>
+      <button onclick="openPublicSection('alur')">Alur</button>
+      <button onclick="openPublicSection('tentang')">Tentang</button>
+      <button onclick="openPublicSection('faq')">FAQ</button>
+      <button onclick="openAuth('login')">Masuk</button>
+      <button onclick="openAuth('register')">Buat Akun</button>
+    </div>
+  </header>
+
+  <main id="publicView">
+    <section class="hero" id="beranda">
+      <div class="hero-orbit orbit-one"></div>
+      <div class="hero-orbit orbit-two"></div>
+      <div class="spark s1">✦</div><div class="spark s2">✦</div><div class="spark s3">✦</div>
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow"><span></span> ORBIT VECTRA 2026</div>
+          <h1>Satu portal untuk <em>lima jalur kompetisi</em> dan seluruh proses pendaftaran.</h1>
+          <p>Pelajari kompetisi, buat akun, isi formulir sesuai kategori, unggah berkas ke Google Drive, simpan draft, kirim pendaftaran, dan pantau hasil verifikasi panitia dari dashboard yang sama.</p>
+          <div class="hero-actions">
+            <button class="btn primary large" onclick="scrollToCompetitions()">Lihat Kompetisi <span>→</span></button>
+            <button class="btn glass large" onclick="APP.user?openDashboard():openAuth('register')">Mulai Pendaftaran</button>
+          </div>
+          <div class="hero-metrics">
+            <div><strong id="metricCompetition">5</strong><span>Kompetisi</span></div>
+            <div><strong>2</strong><span>Role Pengguna</span></div>
+            <div><strong>1</strong><span>Portal Terintegrasi</span></div>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="logo-stage">
+            <div class="ring ring-a"></div><div class="ring ring-b"></div>
+            <div class="planet p1"></div><div class="planet p2"></div>
+            <div class="logo-card">
+              <img id="heroLogo" alt="Logo VECTRA" class="hidden">
+              <div id="heroLogoFallback" class="logo-fallback">V</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="quick-strip">
+      <div class="container quick-grid">
+        <div><b>Google Sheets</b><span>Database akun dan pendaftaran</span></div>
+        <div><b>Google Drive</b><span>Penyimpanan berkas peserta</span></div>
+        <div><b>Dashboard Peserta</b><span>Draft, submit, status, revisi</span></div>
+        <div><b>Dashboard Admin</b><span>Kelola lomba dan verifikasi</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="kompetisi">
+      <div class="container">
+        <div class="section-head">
+          <div><span class="section-kicker">KOMPETISI VECTRA</span><h2>Pilih jalur kompetisi yang sesuai</h2></div>
+          <p>Setiap kategori memiliki sasaran peserta, ketentuan, timeline, dan formulir pendaftaran yang berbeda. Detail dapat dibuka tanpa membuat akun.</p>
+        </div>
+        <div class="competition-grid" id="competitionGrid"></div>
+      </div>
+    </section>
+
+    <section class="section soft" id="alur">
+      <div class="container">
+        <div class="section-head centered"><div><span class="section-kicker">ALUR PENDAFTARAN</span><h2>Dari akun hingga verifikasi</h2><p class="section-center-copy">Portal menyimpan progres pendaftar agar proses tidak perlu diselesaikan dalam satu sesi.</p></div></div>
+        <div class="steps">
+          <div class="step"><span>01</span><b>Buat akun</b><p>Daftar menggunakan nama, email aktif, nomor WhatsApp, dan password minimal delapan karakter.</p></div>
+          <div class="step"><span>02</span><b>Pilih kompetisi</b><p>Baca sasaran peserta, tema, persyaratan, timeline, dan penghargaan sebelum membuka formulir.</p></div>
+          <div class="step"><span>03</span><b>Isi & simpan draft</b><p>Lengkapi form sesuai lomba. Data dapat disimpan sebagai DRAFT dan dilanjutkan kembali.</p></div>
+          <div class="step"><span>04</span><b>Unggah berkas</b><p>Berkas yang diminta tersimpan ke folder Google Drive berdasarkan nomor registrasi.</p></div>
+          <div class="step"><span>05</span><b>Kirim pendaftaran</b><p>Setelah field wajib lengkap, peserta melakukan submit dan memperoleh nomor registrasi.</p></div>
+          <div class="step"><span>06</span><b>Pantau verifikasi</b><p>Status dapat berubah menjadi UNDER_REVIEW, VERIFIED, REVISION, atau REJECTED beserta catatan admin.</p></div>
+        </div>
+        <div class="flow-statuses">
+          <span>DRAFT</span><i>→</i><span>SUBMITTED</span><i>→</i><span>UNDER_REVIEW</span><i>→</i><span>VERIFIED</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tentang">
+      <div class="container about-grid">
+        <div>
+          <span class="section-kicker">TENTANG PORTAL</span>
+          <h2>Landing page publik dan sistem administrasi dalam satu Web App.</h2>
+          <div class="about-badge">VECTRA Competition Portal · Firebase Auth + Google Apps Script API</div>
+        </div>
+        <div class="about-copy">
+          <p>VECTRA Competition Portal dirancang sebagai pusat informasi dan pendaftaran ORBIT VECTRA 2026. Area publik menampilkan informasi lomba, sedangkan akun peserta dan admin memiliki dashboard yang terpisah sesuai kebutuhan.</p>
+          <div class="feature-list">
+            <div>✓ Akun pendaftar & admin</div><div>✓ Form dinamis per lomba</div>
+            <div>✓ Database Google Sheets</div><div>✓ Penyimpanan Google Drive</div>
+            <div>✓ Simpan draft otomatis</div><div>✓ Status verifikasi</div>
+            <div>✓ Tambah lomba dari admin</div><div>✓ Logo berbeda tiap lomba</div>
+            <div>✓ Riwayat aktivitas</div><div>✓ Responsive desktop/mobile</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section soft">
+      <div class="container">
+        <div class="section-head">
+          <div><span class="section-kicker">AREA PENGGUNA</span><h2>Dua role, dua pengalaman kerja</h2></div>
+          <p>Satu mekanisme autentikasi menentukan apakah pengguna diarahkan ke dashboard pendaftar atau dashboard admin.</p>
+        </div>
+        <div class="role-grid">
+          <article class="role-card">
+            <div class="role-icon">P</div><h3>Pendaftar</h3>
+            <ul><li>Memilih kompetisi</li><li>Mengisi dan menyimpan draft</li><li>Mengunggah dokumen</li><li>Melihat nomor registrasi</li><li>Memantau status dan catatan revisi</li></ul>
+            <button class="btn primary" onclick="openAuth('register')">Buat Akun Pendaftar</button>
+          </article>
+          <article class="role-card admin-role">
+            <div class="role-icon">A</div><h3>Administrator</h3>
+            <ul><li>Melihat statistik pendaftaran</li><li>Memverifikasi peserta</li><li>Mengubah status dan memberi catatan</li><li>Menambah atau menonaktifkan lomba</li><li>Mengecek Spreadsheet dan folder Drive</li></ul>
+            <button class="btn ghost" onclick="openAuth('login')">Masuk sebagai Admin</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq">
+      <div class="container">
+        <div class="section-head centered"><div><span class="section-kicker">FAQ</span><h2>Pertanyaan yang sering muncul</h2></div></div>
+        <div class="faq-list">
+          <details open><summary>Apakah harus membuat akun sebelum mendaftar lomba?</summary><p>Ya. Akun menjadi identitas utama untuk menyimpan draft, menghubungkan pendaftaran dengan dokumen, dan menampilkan status verifikasi.</p></details>
+          <details><summary>Apakah form dapat disimpan sebelum selesai?</summary><p>Ya. Gunakan tombol <b>Simpan Draft</b>. Selama status masih DRAFT atau REVISION, data dapat diperbarui.</p></details>
+          <details><summary>Di mana file peserta disimpan?</summary><p>File disimpan ke Google Drive pada folder utama yang dikonfigurasi di <code>Code.gs</code>. Sistem membuat subfolder berdasarkan lomba dan nomor registrasi.</p></details>
+          <details><summary>Apakah admin dapat menambah lomba baru?</summary><p>Ya. Admin dapat membuka menu <b>Kelola Lomba</b>, menambahkan data lomba, logo, tanggal, tema, dan ketentuan dasar tanpa membuat landing page baru.</p></details>
+          <details><summary>Bagaimana jika panitia meminta perbaikan dokumen?</summary><p>Admin dapat memberi status REVISION beserta catatan. Pendaftar dapat membuka kembali formulir, memperbaiki data atau file, lalu mengirim ulang.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="container cta-card">
+        <div><span class="section-kicker light">VECTRA 2026</span><h2>Siap mengikuti kompetisi?</h2><p>Buat akun pendaftar dan mulai isi formulir kompetisi yang Anda pilih.</p></div>
+        <div class="cta-actions"><button class="btn gold large" onclick="openAuth('register')">Buat Akun</button><button class="btn glass large" onclick="openAuth('login')">Masuk Portal</button></div>
+      </div>
+    </section>
+  </main>
+
+  <main id="dashboardView" class="dashboard hidden">
+    <div class="container dashboard-shell">
+      <aside class="sidebar">
+        <div class="side-brand"><span>V</span><div><b>VECTRA</b><small>Competition Portal</small></div></div>
+        <div id="sideUser" class="side-user"></div>
+        <nav id="sideMenu"></nav>
+        <button class="side-logout" onclick="logoutApp()">Keluar</button>
+      </aside>
+      <section class="dash-content">
+        <div class="dash-topbar">
+          <div><span class="section-kicker" id="dashKicker">DASHBOARD</span><h2 id="dashTitle">Ringkasan</h2></div>
+          <button class="btn ghost small" onclick="goPublic()">Lihat Landing Page</button>
+        </div>
+        <div id="dashboardContent"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer id="publicFooter">
+    <div class="container footer-grid">
+      <div><b class="footer-brand">VECTRA</b><p>Competition Portal 2026</p><small>Firebase Auth · Google Sheets · Google Drive · Vercel</small></div>
+      <div><strong>Navigasi</strong><button onclick="openPublicSection('kompetisi')">Kompetisi</button><button onclick="openPublicSection('alur')">Alur</button><button onclick="openPublicSection('tentang')">Tentang</button></div>
+      <div><strong>Akses</strong><button onclick="openAuth('login')">Masuk</button><button onclick="openAuth('register')">Buat Akun</button><span>Admin: admin@uin-suka.ac.id</span></div>
+    </div>
+  </footer>
+
+  <div class="modal-backdrop hidden" id="authModal" onclick="closeModalOnBackdrop(event,'authModal')">
+    <div class="modal auth-modal">
+      <button class="modal-close" onclick="closeModal('authModal')">×</button>
+      <div class="auth-tabs"><button id="tabLogin" onclick="switchAuth('login')">Masuk</button><button id="tabRegister" onclick="switchAuth('register')">Buat Akun</button></div>
+      <div id="authContent"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="detailModal" onclick="closeModalOnBackdrop(event,'detailModal')">
+    <div class="modal detail-modal"><button class="modal-close" onclick="closeModal('detailModal')">×</button><div id="detailContent"></div></div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="formModal" onclick="closeModalOnBackdrop(event,'formModal')">
+    <div class="modal form-modal"><button class="modal-close" onclick="closeModal('formModal')">×</button><div id="registrationFormContent"></div></div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="competitionAdminModal" onclick="closeModalOnBackdrop(event,'competitionAdminModal')">
+    <div class="modal form-modal"><button class="modal-close" onclick="closeModal('competitionAdminModal')">×</button><div id="competitionAdminContent"></div></div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="adminRegModal" onclick="closeModalOnBackdrop(event,'adminRegModal')">
+    <div class="modal detail-modal"><button class="modal-close" onclick="closeModal('adminRegModal')">×</button><div id="adminRegContent"></div></div>
+  </div>
+
+  <!--
+    VECTRA no longer runs inside HtmlService, so this is now just a placeholder.
+    Real competitions/brand logo are fetched over the network at boot (see initApp() in script.js)
+    instead of being server-side templated into this object.
+  -->
+  <script>window.__VECTRA_BOOTSTRAP__ = { ready: false, competitions: [] };</script>
+
+  <!-- Firebase (Auth only) — compat build so it drops in with no bundler -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
