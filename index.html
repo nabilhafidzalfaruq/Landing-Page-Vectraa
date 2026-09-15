@@ -220,6 +220,19 @@
     <div class="modal detail-modal"><button class="modal-close" onclick="closeModal('adminRegModal')">×</button><div id="adminRegContent"></div></div>
   </div>
 
+  <!-- Pengumpulan Karya: peserta mengunggah karya per tahap, terpisah dari form pendaftaran -->
+  <div class="modal-backdrop hidden" id="submissionFormModal" onclick="closeModalOnBackdrop(event,'submissionFormModal')">
+    <div class="modal form-modal"><button class="modal-close" onclick="closeModal('submissionFormModal')">×</button><div id="submissionFormContent"></div></div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="submissionStageAdminModal" onclick="closeModalOnBackdrop(event,'submissionStageAdminModal')">
+    <div class="modal form-modal"><button class="modal-close" onclick="closeModal('submissionStageAdminModal')">×</button><div id="submissionStageAdminContent"></div></div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="adminSubmissionModal" onclick="closeModalOnBackdrop(event,'adminSubmissionModal')">
+    <div class="modal detail-modal"><button class="modal-close" onclick="closeModal('adminSubmissionModal')">×</button><div id="adminSubmissionContent"></div></div>
+  </div>
+
   <!--
     VECTRA no longer runs inside HtmlService, so this is now just a placeholder.
     Real competitions/brand logo are fetched over the network at boot (see initApp() in script.js)

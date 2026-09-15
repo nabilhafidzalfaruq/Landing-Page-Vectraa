@@ -292,7 +292,7 @@ function renderRegistrationForm(data){
   }
 }
 
-function renderField(f,value){
+function renderField(f,value,uploadHandler='uploadFormFile'){
   const req=f.required?'<span class="req">*</span>':'';
   const note=f.note?`<div class="field-note">${escapeHtml(f.note)}</div>`:'';
   const full = ['textarea','checkbox','file'].includes(f.type) ? ' full' : '';
@@ -303,7 +303,7 @@ function renderField(f,value){
   if(f.type==='file'){
     const fileObj = value && typeof value==='object'?value:null;
     const existing=fileObj?`<a class="file-link" href="${escapeAttr(fileObj.url||'#')}" target="_blank">✓ ${escapeHtml(fileObj.fileName||'File tersimpan')}</a>`:'Belum ada file';
-    return `<div class="field${full}" data-key="${f.key}"><label>${escapeHtml(f.label)} ${req}</label><div class="file-box"><input type="file" id="file_${f.key}" accept="${escapeAttr(f.accept||'')}" onchange="uploadFormFile('${f.key}')"><input type="hidden" name="${f.key}" data-file-json value="${fileObj?escapeAttr(JSON.stringify(fileObj)):''}"><div class="file-status ${fileObj?'ok':''}" id="fileStatus_${f.key}">${existing}</div></div>${note}</div>`;
+    return `<div class="field${full}" data-key="${f.key}"><label>${escapeHtml(f.label)} ${req}</label><div class="file-box"><input type="file" id="file_${f.key}" accept="${escapeAttr(f.accept||'')}" onchange="${uploadHandler}('${f.key}')"><input type="hidden" name="${f.key}" data-file-json value="${fileObj?escapeAttr(JSON.stringify(fileObj)):''}"><div class="file-status ${fileObj?'ok':''}" id="fileStatus_${f.key}">${existing}</div></div>${note}</div>`;
   }
   const type=['email','tel','number','date','url'].includes(f.type)?f.type:'text';
   return `<div class="field${full}" data-key="${f.key}"><label>${escapeHtml(f.label)} ${req}</label><input type="${type}" name="${f.key}" value="${safe}" placeholder="${escapeAttr(f.placeholder||'')}">${note}</div>`;
@@ -412,6 +412,7 @@ function renderSidebar(){
   if(u.role==='admin') menu.innerHTML=`
     <button class="active" onclick="renderAdminOverview(this)">Ringkasan</button>
     <button onclick="renderAdminRegistrations(this)">Pendaftaran</button>
+    <button onclick="renderAdminSubmissions(this)">Pengumpulan Karya</button>
     <button onclick="renderAdminCompetitions(this)">Kelola Lomba</button>
     <button onclick="renderAdminSystem(this)">Sistem</button>
     <button onclick="renderAccountSettings(this)">Akun</button>`;
@@ -419,6 +420,7 @@ function renderSidebar(){
     <button class="active" onclick="renderParticipantOverview(this)">Ringkasan</button>
     <button onclick="renderParticipantCompetitions(this)">Daftar Lomba</button>
     <button onclick="renderParticipantRegistrations(this)">Pendaftaran Saya</button>
+    <button onclick="renderParticipantSubmissions(this)">Pengumpulan Karya</button>
     <button onclick="renderAccountSettings(this)">Akun</button>`;
 }
 
@@ -442,6 +444,132 @@ function renderParticipantRegistrations(btn){setActiveMenu(btn);setDashTitle('DA
 function renderRegCards(regs){
   if(!regs.length)return '<div class="empty">Belum ada pendaftaran. Pilih salah satu lomba untuk memulai.</div>';
   return `<div class="reg-cards">${regs.map(r=>`<div class="reg-card"><div class="reg-id">${escapeHtml(r.registration_id)}</div><h4>${escapeHtml(r.competition_name)}</h4><div class="progress"><span style="width:${r.progress}%"></span></div><div class="reg-meta"><span>Progress ${r.progress}%</span><span class="status-pill ${r.status}">${r.status}</span></div>${r.admin_note?`<p class="field-note" style="margin-top:10px">Catatan: ${escapeHtml(r.admin_note)}</p>`:''}<div style="margin-top:14px"><button class="btn ghost small" onclick="openRegistrationForm('${r.competition_id}')">${r.status==='DRAFT'||r.status==='REVISION'?'Lanjutkan / Perbaiki':'Lihat Form'}</button></div></div>`).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Pengumpulan Karya — decoupled from the registration form. Each competition
+// can define multiple submission "tahap" (stages), each with its own
+// open/close window set by the admin and its own file/field schema. A
+// participant only needs an existing registration for the competition; the
+// stage's own dates decide whether the upload button is enabled, not the
+// registration's status.
+// ---------------------------------------------------------------------------
+async function renderParticipantSubmissions(btn){
+  setActiveMenu(btn);setDashTitle('KARYA','Pengumpulan Karya');
+  const content=document.getElementById('dashboardContent');
+  content.innerHTML='<div class="panel" style="margin-top:0"><div class="empty">Memuat data tahap karya...</div></div>';
+  try{
+    const overview=await gs('getMySubmissionsOverview',APP.token);
+    APP.dashboard.submissions=overview;
+    if(!overview.length){content.innerHTML='<div class="panel" style="margin-top:0"><div class="empty">Belum ada lomba yang terdaftar. Daftar lomba dulu untuk membuka tahap pengumpulan karya.</div></div>';return}
+    content.innerHTML=overview.map(regOverview=>`
+      <div class="panel" style="margin-top:0">
+        <div class="panel-head"><h3>${escapeHtml(regOverview.competition_name)}</h3><span class="reg-id">${escapeHtml(regOverview.registration_id)}</span></div>
+        <div class="reg-cards">${regOverview.stages.map(s=>renderSubmissionStageCard(regOverview,s)).join('')}</div>
+      </div>`).join('');
+  }catch(e){handleSessionError(e)}
+}
+
+function renderSubmissionStageCard(regOverview,s){
+  const now=new Date();
+  const opensAt=s.opens_at?new Date(s.opens_at):null;
+  const closesAt=s.closes_at?new Date(s.closes_at):null;
+  const notOpenYet=opensAt&&now<opensAt;
+  const alreadyClosed=closesAt&&now>closesAt;
+  const isOpen=s.is_open!==undefined?s.is_open:(!notOpenYet&&!alreadyClosed);
+  const status=s.submission?s.submission.status:'BELUM KUMPUL';
+  const pillClass=['DRAFT','SUBMITTED','UNDER_REVIEW','VERIFIED','REVISION','REJECTED'].includes(status)?status:'';
+  let windowNote='Selalu terbuka';
+  if(opensAt&&closesAt)windowNote=`${formatDateTime(s.opens_at)} – ${formatDateTime(s.closes_at)}`;
+  else if(opensAt)windowNote=`Dibuka mulai ${formatDateTime(s.opens_at)}`;
+  else if(closesAt)windowNote=`Ditutup ${formatDateTime(s.closes_at)}`;
+  let actionBtn;
+  if(notOpenYet)actionBtn='<button class="btn ghost small" disabled>Belum Dibuka</button>';
+  else if(alreadyClosed&&!s.submission)actionBtn='<button class="btn ghost small" disabled>Sudah Ditutup</button>';
+  else actionBtn=`<button class="btn ${s.submission?'ghost':'primary'} small" onclick="openSubmissionForm('${s.stage_id}')">${s.submission?'Lihat / Perbarui':'Unggah Karya'}</button>`;
+  return `<div class="reg-card">
+    <div class="reg-id">TAHAP ${escapeHtml(String(s.order||''))}</div>
+    <h4>${escapeHtml(s.stage_name)}</h4>
+    <p class="field-note" style="margin:6px 0 0">${escapeHtml(s.instructions||'')}</p>
+    <div class="reg-meta" style="margin-top:14px"><span>${escapeHtml(windowNote)}</span>${pillClass?`<span class="status-pill ${pillClass}">${status}</span>`:'<span class="status-pill">'+escapeHtml(status)+'</span>'}</div>
+    ${s.submission&&s.submission.admin_note?`<p class="field-note" style="margin-top:10px">Catatan: ${escapeHtml(s.submission.admin_note)}</p>`:''}
+    <div style="margin-top:14px">${actionBtn}</div>
+  </div>`;
+}
+
+async function openSubmissionForm(stageId){
+  setLoading(true);try{
+    const data=await gs('getSubmissionForm',APP.token,stageId);APP.currentSubmissionForm=data;
+    renderSubmissionForm(data);openModal('submissionFormModal');
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
+}
+
+function renderSubmissionForm(data){
+  const s=data.stage,p=data.payload||{},schema=data.schema||[];
+  const status=data.submission?data.submission.status:'BELUM KUMPUL';
+  const editable=data.editable!==false;
+  const fields=schema.map(f=>renderField(f,p[f.key],'uploadSubmissionFile')).join('');
+  const readonlyNote=!editable?`<div class="file-box" style="margin-top:16px"><b>Form terkunci</b><div class="file-status">Tahap ini berstatus ${escapeHtml(status)} atau sudah melewati jadwal.</div></div>`:'';
+  document.getElementById('submissionFormContent').innerHTML=`
+    <span class="section-kicker">${escapeHtml(s.competition_name)} · TAHAP ${escapeHtml(String(s.order||''))}</span>
+    <h2 class="form-title">${escapeHtml(s.stage_name)}</h2>
+    <p class="form-subtitle">${escapeHtml(s.instructions||'')}</p>
+    <form id="dynamicSubmissionForm" onsubmit="event.preventDefault()" style="margin-top:22px"><div class="form-grid">${fields}</div></form>
+    ${data.submission && data.submission.admin_note?`<div class="file-box" style="margin-top:16px"><b>Catatan panitia</b><div class="file-status">${escapeHtml(data.submission.admin_note)}</div></div>`:''}
+    ${readonlyNote}
+    <div class="form-actions">${editable?'<button class="btn ghost" onclick="saveCurrentSubmissionDraft()">Simpan Draft</button><button class="btn primary" onclick="submitCurrentSubmission()">Kumpulkan Karya</button>':'<span></span><button class="btn ghost" onclick="closeModal(\'submissionFormModal\')">Tutup</button>'}</div>`;
+  if(!editable){
+    document.querySelectorAll('#dynamicSubmissionForm input,#dynamicSubmissionForm select,#dynamicSubmissionForm textarea').forEach(el=>{if(el.type!=='hidden')el.disabled=true});
+  }
+}
+
+async function uploadSubmissionFile(key){
+  const input=document.getElementById('file_'+key);
+  const file=input.files && input.files[0];
+  if(!file)return;
+  const statusEl=document.getElementById('fileStatus_'+key);
+  const hiddenEl=document.querySelector(`#dynamicSubmissionForm [name="${key}"][data-file-json]`);
+  if(statusEl){statusEl.textContent='Mengunggah...';statusEl.classList.remove('ok')}
+  try{
+    const base64=await readFileBase64(file);
+    const fileObj=await gs('uploadSubmissionFile',APP.token,APP.currentSubmissionForm.stage.stage_id,key,{
+      fileName:file.name, mimeType:file.type||'application/octet-stream', base64
+    });
+    if(hiddenEl)hiddenEl.value=JSON.stringify(fileObj);
+    if(statusEl){
+      statusEl.innerHTML=`<a class="file-link" href="${escapeAttr(fileObj.url||'#')}" target="_blank">✓ ${escapeHtml(fileObj.fileName||file.name)}</a>`;
+      statusEl.classList.add('ok');
+    }
+  }catch(e){
+    if(statusEl){statusEl.textContent='Gagal mengunggah file.';statusEl.classList.remove('ok')}
+    toast(e.message,true);
+  }
+}
+
+function collectSubmissionPayload(){
+  const form=document.getElementById('dynamicSubmissionForm');const payload={};
+  APP.currentSubmissionForm.schema.forEach(f=>{
+    const el=form.elements[f.key];if(!el)return;
+    if(f.type==='checkbox')payload[f.key]=!!el.checked;
+    else if(f.type==='file'){try{payload[f.key]=el.value?JSON.parse(el.value):null}catch(e){payload[f.key]=null}}
+    else payload[f.key]=el.value;
+  });
+  return payload;
+}
+
+async function saveCurrentSubmissionDraft(){
+  const payload=collectSubmissionPayload();setLoading(true);try{
+    const sub=await gs('saveSubmissionDraft',APP.token,APP.currentSubmissionForm.stage.stage_id,payload);APP.currentSubmissionForm.submission=sub;
+    toast('Draft karya tersimpan.');closeModal('submissionFormModal');renderParticipantSubmissions();
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
+}
+
+async function submitCurrentSubmission(){
+  if(!confirm('Kumpulkan karya untuk tahap ini sekarang? Pastikan file sudah benar.'))return;
+  const payload=collectSubmissionPayload();setLoading(true);try{
+    const sub=await gs('submitSubmission',APP.token,APP.currentSubmissionForm.stage.stage_id,payload);APP.currentSubmissionForm.submission=sub;
+    toast('Karya berhasil dikumpulkan.');closeModal('submissionFormModal');renderParticipantSubmissions();
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
 }
 
 function renderAdminOverview(btn){
@@ -504,6 +632,109 @@ async function toggleCompetitionStatus(id,status){
     await gs('adminSetCompetitionStatus',APP.token,id,status);
     APP.dashboard.competitions=await gs('getAdminCompetitions',APP.token);
     APP.competitions=APP.dashboard.competitions.filter(c=>String(c.status||'').toUpperCase()!=='NONAKTIF');renderCompetitions();renderAdminCompetitions();toast('Status lomba diperbarui.');
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
+}
+
+// ---------------------------------------------------------------------------
+// Admin: Pengumpulan Karya — manage stages per competition (name, order,
+// open/close window, instructions, schema) and review what's been uploaded,
+// independent from the registration review table above.
+// ---------------------------------------------------------------------------
+async function renderAdminSubmissions(btn){
+  setActiveMenu(btn);setDashTitle('ADMIN','Pengumpulan Karya');
+  const comps=APP.dashboard.competitions||[];
+  const content=document.getElementById('dashboardContent');
+  content.innerHTML=`<div class="panel" style="margin-top:0">
+    <div class="panel-head"><div><h3>Tahap per Lomba</h3><p class="form-subtitle" style="margin:3px 0 0">Pilih lomba untuk mengatur tahap pengumpulan karyanya.</p></div>
+    <select class="search" id="submissionCompFilter" onchange="loadSubmissionStagesAdmin()"><option value="">Pilih lomba...</option>${comps.map(c=>`<option value="${escapeAttr(c.competition_id)}">${escapeHtml(c.name)}</option>`).join('')}</select></div>
+    <div id="submissionStageList"><div class="empty">Pilih lomba di atas untuk melihat tahapnya.</div></div>
+  </div>
+  <div class="panel"><div class="panel-head"><div><h3>Data Karya Masuk</h3><p class="form-subtitle" style="margin:3px 0 0">Pagination server-side, maksimal 25 data per halaman.</p></div><div class="admin-toolbar"><input class="search" id="submissionSearch" placeholder="Cari nama, email, ID..." oninput="scheduleSubmissionSearch()"><select class="search" id="submissionStatusFilter" onchange="loadAdminSubmissionPage(1)"><option value="">Semua Status</option><option>DRAFT</option><option>SUBMITTED</option><option>UNDER_REVIEW</option><option>VERIFIED</option><option>REVISION</option><option>REJECTED</option></select></div></div><div id="submissionTableBox"><div class="empty">Memuat data terbaru...</div></div><div id="submissionPager"></div></div>`;
+  await loadAdminSubmissionPage(1);
+}
+
+async function loadSubmissionStagesAdmin(){
+  const competitionId=val('submissionCompFilter');
+  const box=document.getElementById('submissionStageList');
+  if(!competitionId){box.innerHTML='<div class="empty">Pilih lomba di atas untuk melihat tahapnya.</div>';return}
+  box.innerHTML='<div class="empty">Memuat tahap...</div>';
+  try{
+    const stages=await gs('getAdminSubmissionStages',APP.token,competitionId);
+    APP.adminSubmissionStages=stages;
+    box.innerHTML=`<div class="comp-admin-list">${stages.map(s=>`<div class="comp-admin-row"><div><h4>Tahap ${escapeHtml(String(s.order))} · ${escapeHtml(s.stage_name)}</h4><p>${escapeHtml(formatDateTime(s.opens_at))} – ${escapeHtml(formatDateTime(s.closes_at))} · ${escapeHtml(s.status)}</p></div><div class="row-actions"><button class="btn ghost small" onclick="openSubmissionStageAdmin('${competitionId}','${s.stage_id}')">Edit</button><button class="btn ${s.status==='NONAKTIF'?'gold':'danger'} small" onclick="toggleSubmissionStageStatus('${competitionId}','${s.stage_id}','${s.status==='NONAKTIF'?'AKTIF':'NONAKTIF'}')">${s.status==='NONAKTIF'?'Aktifkan':'Nonaktifkan'}</button></div></div>`).join('')||'<div class="empty">Belum ada tahap untuk lomba ini.</div>'}
+    <button class="btn primary small" style="margin-top:12px" onclick="openSubmissionStageAdmin('${competitionId}')">+ Tambah Tahap</button></div>`;
+  }catch(e){handleSessionError(e)}
+}
+
+function openSubmissionStageAdmin(competitionId,stageId=''){
+  const s=stageId?(APP.adminSubmissionStages||[]).find(x=>x.stage_id===stageId):null;
+  document.getElementById('submissionStageAdminContent').innerHTML=`<span class="section-kicker">ADMIN · ${s?'EDIT':'TAMBAH'} TAHAP KARYA</span><h2 class="form-title">${s?'Edit tahap':'Tambah tahap baru'}</h2><p class="form-subtitle">Tahap default berisi satu field unggah file. Untuk field tambahan (misal deskripsi karya), isi Skema Tambahan dalam format JSON — bentuknya sama seperti form_schema_json pada sheet LOMBA.</p>
+  <input type="hidden" id="ssId" value="${escapeAttr(stageId)}"><input type="hidden" id="ssCompId" value="${escapeAttr(competitionId)}">
+  <div class="form-grid">
+    <div class="field full"><label>Nama tahap *</label><input id="ssName" value="${escapeAttr(s?s.stage_name:'')}" placeholder="Karya Awal / Revisi Final"></div>
+    <div class="field"><label>Urutan</label><input id="ssOrder" type="number" value="${escapeAttr(s?s.order:'')}"></div>
+    <div class="field"><label>Label field file</label><input id="ssFileLabel" value="${escapeAttr(s?s.file_label:'File Karya')}" placeholder="File poster"></div>
+    <div class="field"><label>Buka mulai</label><input id="ssStart" type="datetime-local" value="${escapeAttr(s?s.opens_at:'')}"></div>
+    <div class="field"><label>Tutup pada</label><input id="ssEnd" type="datetime-local" value="${escapeAttr(s?s.closes_at:'')}"></div>
+    <div class="field full"><label>Instruksi (ditampilkan ke peserta)</label><textarea id="ssInstructions" placeholder="JPG/JPEG/PNG, maksimal 15 MB. Panduan: A2, minimal 300 dpi.">${escapeHtml(s?s.instructions:'')}</textarea></div>
+    <div class="field full"><label>Skema tambahan (JSON, opsional)</label><textarea id="ssExtraSchema" placeholder='[{"key":"deskripsi","label":"Deskripsi Karya","type":"textarea"}]'>${escapeHtml(s&&s.extra_schema_json?s.extra_schema_json:'')}</textarea></div>
+  </div>
+  <div class="form-actions"><button class="btn ghost" onclick="closeModal('submissionStageAdminModal')">Batal</button><button class="btn primary" onclick="saveSubmissionStageAdmin()">Simpan Tahap</button></div>`;
+  openModal('submissionStageAdminModal');
+}
+
+async function saveSubmissionStageAdmin(){
+  const payload={stage_id:val('ssId'),competition_id:val('ssCompId'),stage_name:val('ssName'),order:val('ssOrder'),file_label:val('ssFileLabel'),opens_at:val('ssStart'),closes_at:val('ssEnd'),instructions:val('ssInstructions'),extra_schema_json:val('ssExtraSchema'),status:'AKTIF'};
+  setLoading(true);try{
+    await gs('adminUpsertSubmissionStage',APP.token,payload);toast('Tahap karya disimpan.');closeModal('submissionStageAdminModal');
+    await loadSubmissionStagesAdmin();
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
+}
+
+async function toggleSubmissionStageStatus(competitionId,stageId,status){
+  if(!confirm(`Ubah status tahap menjadi ${status}?`))return;setLoading(true);try{
+    await gs('adminSetSubmissionStageStatus',APP.token,stageId,status);toast('Status tahap diperbarui.');
+    await loadSubmissionStagesAdmin();
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
+}
+
+function scheduleSubmissionSearch(){
+  clearTimeout(APP.submissionSearchTimer);APP.submissionSearchTimer=setTimeout(()=>loadAdminSubmissionPage(1),420);
+}
+
+async function loadAdminSubmissionPage(page){
+  APP.adminSubmissionPage=APP.adminSubmissionPage||{page:1,pageSize:25};
+  APP.adminSubmissionPage.page=page||1;
+  APP.adminSubmissionPage.status=val('submissionStatusFilter');APP.adminSubmissionPage.query=val('submissionSearch');
+  const box=document.getElementById('submissionTableBox');if(box)box.innerHTML='<div class="empty">Memuat data...</div>';
+  try{
+    const res=await gs('getAdminSubmissionsPage',APP.token,APP.adminSubmissionPage.page,APP.adminSubmissionPage.pageSize,APP.adminSubmissionPage.status,APP.adminSubmissionPage.query);
+    APP.adminSubmissionPage={...APP.adminSubmissionPage,...res};
+    if(box)box.innerHTML=renderAdminSubmissionTable(res.rows||[]);
+    const pager=document.getElementById('submissionPager');
+    if(pager)pager.innerHTML=`<div class="pager"><button class="btn ghost small" ${res.hasPrev?'':'disabled'} onclick="loadAdminSubmissionPage(${Math.max(1,res.page-1)})">← Sebelumnya</button><span>Halaman ${res.page}</span><button class="btn ghost small" ${res.hasNext?'':'disabled'} onclick="loadAdminSubmissionPage(${res.page+1})">Selanjutnya →</button></div>`;
+  }catch(e){handleSessionError(e)}
+}
+
+function renderAdminSubmissionTable(rows){
+  if(!rows.length)return '<div class="empty">Belum ada data.</div>';
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Peserta</th><th>Lomba</th><th>Tahap</th><th>Status</th><th>Update</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(r.submission_id)}</strong></td><td>${escapeHtml(r.participant_name)}<br><small>${escapeHtml(r.email)}</small></td><td>${escapeHtml(r.competition_name)}</td><td>${escapeHtml(r.stage_name)}</td><td><span class="status-pill ${r.status}">${r.status}</span></td><td>${formatDateTime(r.updated_at)}</td><td><button class="btn ghost small" onclick="openAdminSubmission('${r.submission_id}')">Detail</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+async function openAdminSubmission(id){
+  setLoading(true);try{
+    const d=await gs('adminGetSubmissionDetail',APP.token,id),r=d.submission,p=d.payload||{};
+    const kv=Object.entries(p).map(([k,v])=>{let show='';if(v&&typeof v==='object'&&v.url)show=`<a href="${escapeAttr(v.url)}" target="_blank">${escapeHtml(v.fileName||'Buka file')}</a>`;else if(typeof v==='boolean')show=v?'Ya':'Tidak';else show=escapeHtml(String(v??''));return `<div class="kv"><span>${escapeHtml(humanize(k))}</span><b>${show||'-'}</b></div>`}).join('');
+    document.getElementById('adminSubmissionContent').innerHTML=`<div class="admin-reg-head"><span class="section-kicker">DETAIL KARYA</span><h2>${escapeHtml(r.submission_id)}</h2><p class="form-subtitle" style="margin:0">${escapeHtml(r.participant_name)} · ${escapeHtml(r.competition_name)} · ${escapeHtml(r.stage_name)}</p></div><div class="admin-reg-body"><div class="kv-grid">${kv}</div><div class="admin-status-box"><select id="adminSubmissionStatus" class="input">${['DRAFT','SUBMITTED','UNDER_REVIEW','VERIFIED','REVISION','REJECTED'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}</select><textarea id="adminSubmissionNote" class="input" placeholder="Catatan untuk peserta...">${escapeHtml(r.admin_note||'')}</textarea><button class="btn primary" onclick="saveAdminSubmissionStatus('${r.submission_id}')">Simpan Status</button></div></div>`;
+    openModal('adminSubmissionModal');
+  }catch(e){handleSessionError(e)}finally{setLoading(false)}
+}
+
+async function saveAdminSubmissionStatus(id){
+  setLoading(true);try{
+    await gs('adminUpdateSubmissionStatus',APP.token,id,val('adminSubmissionStatus'),val('adminSubmissionNote'));
+    toast('Status karya diperbarui.');closeModal('adminSubmissionModal');
+    await loadAdminSubmissionPage(APP.adminSubmissionPage?APP.adminSubmissionPage.page:1);
   }catch(e){handleSessionError(e)}finally{setLoading(false)}
 }
 
