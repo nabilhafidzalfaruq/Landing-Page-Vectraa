@@ -420,7 +420,7 @@ function renderRegistrationForm(data) {
     schema = data.schema || [];
   const status = data.registration ? data.registration.status : "BELUM DIMULAI";
   const progress = data.registration ? data.registration.progress : 0;
-  const editable = data.editable !== true;
+  const editable = data.editable;
   const fields = schema.map((f) => renderField(f, p[f.key])).join("");
   const readonlyNote = !editable
     ? `<div class="file-box" style="margin-top:16px"><b>Form terkunci</b><div class="file-status">Pendaftaran berstatus ${escapeHtml(status)}. Data hanya dapat diedit ketika status DRAFT atau REVISION.</div></div>`
