@@ -497,20 +497,30 @@ async function uploadFormFile(key) {
     statusEl.textContent = "Mengunggah...";
     statusEl.classList.remove("ok");
   }
+
   try {
     const base64 = await readFileBase64(file);
-    const fileObj = await gs(
+
+    // 1. Terima paket balasan dari backend GAS
+    const response = await gs(
       "uploadRegistrationFile",
       APP.token,
       APP.currentForm.competition.competition_id,
       key,
       {
+        name: file.name,
         fileName: file.name,
         mimeType: file.type || "application/octet-stream",
         base64,
       },
     );
+
+    // 2. KUNCI PERBAIKAN: Ambil hanya objek 'file'-nya saja!
+    const fileObj = response.file || response;
+
+    // 3. Simpan data yang sudah benar ke hidden input
     if (hiddenEl) hiddenEl.value = JSON.stringify(fileObj);
+
     if (statusEl) {
       statusEl.innerHTML = `<a class="file-link" href="${escapeAttr(fileObj.url || "#")}" target="_blank">✓ ${escapeHtml(fileObj.fileName || file.name)}</a>`;
       statusEl.classList.add("ok");
