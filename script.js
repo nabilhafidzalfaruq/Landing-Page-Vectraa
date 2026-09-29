@@ -497,30 +497,25 @@ async function uploadFormFile(key) {
     statusEl.textContent = "Mengunggah...";
     statusEl.classList.remove("ok");
   }
-
   try {
     const base64 = await readFileBase64(file);
-
-    // 1. Terima paket balasan dari backend GAS
-    const response = await gs(
+    const res = await gs(
       "uploadRegistrationFile",
       APP.token,
       APP.currentForm.competition.competition_id,
       key,
       {
-        name: file.name,
         fileName: file.name,
         mimeType: file.type || "application/octet-stream",
         base64,
       },
     );
-
-    // 2. KUNCI PERBAIKAN: Ambil hanya objek 'file'-nya saja!
-    const fileObj = response.file || response;
-
-    // 3. Simpan data yang sudah benar ke hidden input
+    // uploadRegistrationFile membalas {registration, file} — ambil bagian file-nya saja.
+    const fileObj = res && res.file ? res.file : res;
     if (hiddenEl) hiddenEl.value = JSON.stringify(fileObj);
-
+    // Sinkronkan status/progress registrasi terbaru sekalian, kalau backend mengirimkannya.
+    if (res && res.registration)
+      APP.currentForm.registration = res.registration;
     if (statusEl) {
       statusEl.innerHTML = `<a class="file-link" href="${escapeAttr(fileObj.url || "#")}" target="_blank">✓ ${escapeHtml(fileObj.fileName || file.name)}</a>`;
       statusEl.classList.add("ok");
@@ -532,24 +527,24 @@ async function uploadFormFile(key) {
     }
     toast(e.message, true);
   }
-}
 
-function collectRegistrationPayload() {
-  const form = document.getElementById("dynamicRegistrationForm");
-  const payload = {};
-  APP.currentForm.schema.forEach((f) => {
-    const el = form.elements[f.key];
-    if (!el) return;
-    if (f.type === "checkbox") payload[f.key] = !!el.checked;
-    else if (f.type === "file") {
-      try {
-        payload[f.key] = el.value ? JSON.parse(el.value) : null;
-      } catch (e) {
-        payload[f.key] = null;
-      }
-    } else payload[f.key] = el.value;
-  });
-  return payload;
+  function collectRegistrationPayload() {
+    const form = document.getElementById("dynamicRegistrationForm");
+    const payload = {};
+    APP.currentForm.schema.forEach((f) => {
+      const el = form.elements[f.key];
+      if (!el) return;
+      if (f.type === "checkbox") payload[f.key] = !!el.checked;
+      else if (f.type === "file") {
+        try {
+          payload[f.key] = el.value ? JSON.parse(el.value) : null;
+        } catch (e) {
+          payload[f.key] = null;
+        }
+      } else payload[f.key] = el.value;
+    });
+    return payload;
+  }
 }
 
 async function saveCurrentDraft() {
