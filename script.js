@@ -420,7 +420,7 @@ function renderRegistrationForm(data) {
     schema = data.schema || [];
   const status = data.registration ? data.registration.status : "BELUM DIMULAI";
   const progress = data.registration ? data.registration.progress : 0;
-  const editable = data.editable;
+  const editable = data.editable !== false;
   const fields = schema.map((f) => renderField(f, p[f.key])).join("");
   const readonlyNote = !editable
     ? `<div class="file-box" style="margin-top:16px"><b>Form terkunci</b><div class="file-status">Pendaftaran berstatus ${escapeHtml(status)}. Data hanya dapat diedit ketika status DRAFT atau REVISION.</div></div>`
@@ -499,23 +499,19 @@ async function uploadFormFile(key) {
   }
   try {
     const base64 = await readFileBase64(file);
-    const res = await gs(
+    const fileObj = await gs(
       "uploadRegistrationFile",
       APP.token,
       APP.currentForm.competition.competition_id,
       key,
       {
         fileName: file.name,
+        name: file.name,
         mimeType: file.type || "application/octet-stream",
         base64,
       },
     );
-    // uploadRegistrationFile membalas {registration, file} — ambil bagian file-nya saja.
-    const fileObj = res && res.file ? res.file : res;
     if (hiddenEl) hiddenEl.value = JSON.stringify(fileObj);
-    // Sinkronkan status/progress registrasi terbaru sekalian, kalau backend mengirimkannya.
-    if (res && res.registration)
-      APP.currentForm.registration = res.registration;
     if (statusEl) {
       statusEl.innerHTML = `<a class="file-link" href="${escapeAttr(fileObj.url || "#")}" target="_blank">✓ ${escapeHtml(fileObj.fileName || file.name)}</a>`;
       statusEl.classList.add("ok");
@@ -527,118 +523,6 @@ async function uploadFormFile(key) {
     }
     toast(e.message, true);
   }
-
-  function collectRegistrationPayload() {
-    const form = document.getElementById("dynamicRegistrationForm");
-    const payload = {};
-    APP.currentForm.schema.forEach((f) => {
-      const el = form.elements[f.key];
-      if (!el) return;
-      if (f.type === "checkbox") payload[f.key] = !!el.checked;
-      else if (f.type === "file") {
-        try {
-          payload[f.key] = el.value ? JSON.parse(el.value) : null;
-        } catch (e) {
-          payload[f.key] = null;
-        }
-      } else payload[f.key] = el.value;
-    });
-    return payload;
-  }
-}
-
-async function saveCurrentDraft() {
-  const payload = collectRegistrationPayload();
-  setLoading(true);
-  try {
-    const reg = await gs(
-      "saveDraft",
-      APP.token,
-      APP.currentForm.competition.competition_id,
-      payload,
-    );
-    APP.currentForm.registration = reg;
-    upsertLocalParticipantRegistration(reg);
-    toast("Draft tersimpan.");
-    closeModal("formModal");
-    renderParticipantOverview();
-  } catch (e) {
-    handleSessionError(e);
-  } finally {
-    setLoading(false);
-  }
-}
-
-function upsertLocalParticipantRegistration(reg) {
-  if (!APP.dashboard || APP.user.role !== "pendaftar") return;
-  const rows =
-    APP.dashboard.registrations || (APP.dashboard.registrations = []);
-  const i = rows.findIndex((x) => x.registration_id === reg.registration_id);
-  if (i >= 0) rows[i] = reg;
-  else rows.unshift(reg);
-  rows.sort((a, b) =>
-    String(b.updated_at || "").localeCompare(String(a.updated_at || "")),
-  );
-}
-
-async function submitCurrentRegistration() {
-  if (
-    !confirm(
-      "Kirim pendaftaran sekarang? Pastikan semua data dan dokumen sudah benar.",
-    )
-  )
-    return;
-  const payload = collectRegistrationPayload();
-  setLoading(true);
-  try {
-    const reg = await gs(
-      "submitRegistration",
-      APP.token,
-      APP.currentForm.competition.competition_id,
-      payload,
-    );
-    APP.currentForm.registration = reg;
-    upsertLocalParticipantRegistration(reg);
-    toast("Pendaftaran berhasil dikirim.");
-    closeModal("formModal");
-    renderParticipantOverview();
-  } catch (e) {
-    handleSessionError(e);
-  } finally {
-    setLoading(false);
-  }
-}
-
-async function openDashboard(forceReload = false) {
-  if (!APP.user) return;
-  if (forceReload || !APP.dashboard) {
-    setLoading(true);
-    try {
-      const res = await gs("resumeSession", APP.token);
-      APP.user = res.user;
-      APP.dashboard = res.workspace;
-    } catch (e) {
-      handleSessionError(e);
-      return;
-    } finally {
-      setLoading(false);
-    }
-  }
-  renderNav();
-  document.getElementById("publicView").classList.add("hidden");
-  document.getElementById("publicFooter").classList.add("hidden");
-  document.getElementById("dashboardView").classList.remove("hidden");
-  renderSidebar();
-  if (APP.user.role === "admin") renderAdminOverview();
-  else renderParticipantOverview();
-  window.scrollTo(0, 0);
-}
-
-function goPublic() {
-  document.getElementById("dashboardView").classList.add("hidden");
-  document.getElementById("publicView").classList.remove("hidden");
-  document.getElementById("publicFooter").classList.remove("hidden");
-  window.scrollTo(0, 0);
 }
 
 function collectRegistrationPayload() {
@@ -984,6 +868,7 @@ async function uploadSubmissionFile(key) {
       key,
       {
         fileName: file.name,
+        name: file.name,
         mimeType: file.type || "application/octet-stream",
         base64,
       },
@@ -1245,9 +1130,10 @@ function openSubmissionStageAdmin(competitionId, stageId = "") {
   <div class="form-grid">
     <div class="field full"><label>Nama tahap *</label><input id="ssName" value="${escapeAttr(s ? s.stage_name : "")}" placeholder="Karya Awal / Revisi Final"></div>
     <div class="field"><label>Urutan</label><input id="ssOrder" type="number" value="${escapeAttr(s ? s.order : "")}"></div>
-    <div class="field"><label>Label field file</label><input id="ssFileLabel" value="${escapeAttr(s ? s.file_label : "File Karya")}" placeholder="File poster"></div>
-    <div class="field"><label>Buka mulai</label><input id="ssStart" type="datetime-local" value="${escapeAttr(s ? s.opens_at : "")}"></div>
-    <div class="field"><label>Tutup pada</label><input id="ssEnd" type="datetime-local" value="${escapeAttr(s ? s.closes_at : "")}"></div>
+    <div class="field"><label>Label field file</label><input id="ssFileLabel" value="${escapeAttr(s ? s.file_label : "File Karya")}" placeholder="Video 1"></div>
+    <div class="field full"><label>Label field file ke-2 (opsional)</label><input id="ssFileLabel2" value="${escapeAttr(s && s.file_label_2 ? s.file_label_2 : "")}" placeholder="Video 2 — kosongkan jika hanya butuh 1 upload"><div class="field-note">Isi untuk memunculkan kolom upload kedua di tahap ini. Kedua file wajib diisi peserta sebelum karya bisa dikumpulkan.</div></div>
+    <div class="field"><label>Buka mulai</label><input id="ssStart" type="datetime-local" value="${escapeAttr(toLocalDT(s ? s.opens_at : ""))}"></div>
+    <div class="field"><label>Tutup pada</label><input id="ssEnd" type="datetime-local" value="${escapeAttr(toLocalDT(s ? s.closes_at : ""))}"></div>
     <div class="field full"><label>Instruksi (ditampilkan ke peserta)</label><textarea id="ssInstructions" placeholder="JPG/JPEG/PNG, maksimal 15 MB. Panduan: A2, minimal 300 dpi.">${escapeHtml(s ? s.instructions : "")}</textarea></div>
     <div class="field full"><label>Skema tambahan (JSON, opsional)</label><textarea id="ssExtraSchema" placeholder='[{"key":"deskripsi","label":"Deskripsi Karya","type":"textarea"}]'>${escapeHtml(s && s.extra_schema_json ? s.extra_schema_json : "")}</textarea></div>
   </div>
@@ -1262,6 +1148,7 @@ async function saveSubmissionStageAdmin() {
     stage_name: val("ssName"),
     order: val("ssOrder"),
     file_label: val("ssFileLabel"),
+    file_label_2: val("ssFileLabel2"),
     opens_at: val("ssStart"),
     closes_at: val("ssEnd"),
     instructions: val("ssInstructions"),
@@ -1599,4 +1486,24 @@ function scrollToCompetitions() {
 }
 function toggleMobileMenu() {
   document.getElementById("mobileLinks").classList.toggle("hidden");
+}
+
+// Ubah tanggal dari Sheets (ISO/Date) jadi format datetime-local (YYYY-MM-DDTHH:mm, zona lokal).
+function toLocalDT(v) {
+  if (!v) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(v))) return String(v);
+  const d = new Date(v);
+  if (isNaN(d)) return "";
+  const p = (n) => String(n).padStart(2, "0");
+  return (
+    d.getFullYear() +
+    "-" +
+    p(d.getMonth() + 1) +
+    "-" +
+    p(d.getDate()) +
+    "T" +
+    p(d.getHours()) +
+    ":" +
+    p(d.getMinutes())
+  );
 }
