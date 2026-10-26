@@ -474,7 +474,16 @@ function renderField(f, value, uploadHandler = "uploadFormFile") {
 function readFileBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onload = () => {
+      const b = String(r.result).split(",")[1] || "";
+      b
+        ? resolve(b)
+        : reject(
+            new Error(
+              "File gagal dibaca (kosong/terlalu besar). Untuk video, gunakan link Drive/YouTube.",
+            ),
+          );
+    };
     r.onerror = reject;
     r.readAsDataURL(file);
   });
@@ -498,8 +507,11 @@ async function uploadFormFile(key) {
     statusEl.classList.remove("ok");
   }
   try {
+    const fdef =
+      (APP.currentForm.schema || []).find((x) => x.key === key) || {};
+    if (!checkFileSize(file, fdef.maxMB || 5, input, statusEl)) return;
     const base64 = await readFileBase64(file);
-    const fileObj = await gs(
+    const res = await gs(
       "uploadRegistrationFile",
       APP.token,
       APP.currentForm.competition.competition_id,
@@ -511,6 +523,10 @@ async function uploadFormFile(key) {
         base64,
       },
     );
+    // backend membalas {registration, file}; yang disimpan hanya bagian file
+    const fileObj = res && res.file ? res.file : res;
+    if (res && res.registration)
+      APP.currentForm.registration = res.registration;
     if (hiddenEl) hiddenEl.value = JSON.stringify(fileObj);
     if (statusEl) {
       statusEl.innerHTML = `<a class="file-link" href="${escapeAttr(fileObj.url || "#")}" target="_blank">✓ ${escapeHtml(fileObj.fileName || file.name)}</a>`;
@@ -860,6 +876,9 @@ async function uploadSubmissionFile(key) {
     statusEl.classList.remove("ok");
   }
   try {
+    const fdef =
+      (APP.currentSubmissionForm.schema || []).find((x) => x.key === key) || {};
+    if (!checkFileSize(file, fdef.maxMB || 15, input, statusEl)) return;
     const base64 = await readFileBase64(file);
     const fileObj = await gs(
       "uploadSubmissionFile",
@@ -1506,4 +1525,23 @@ function toLocalDT(v) {
     ":" +
     p(d.getMinutes())
   );
+}
+
+// Tolak file yang melebihi batas SEBELUM dibaca/dikirim (video 1 GB tidak akan pernah muat lewat Apps Script).
+function checkFileSize(file, maxMB, input, statusEl) {
+  const mb = file.size / (1024 * 1024);
+  if (mb <= Number(maxMB)) return true;
+  if (input) input.value = "";
+  if (statusEl) {
+    statusEl.textContent =
+      "Ukuran file " + mb.toFixed(1) + " MB melebihi batas " + maxMB + " MB.";
+    statusEl.classList.remove("ok");
+  }
+  toast(
+    "Ukuran file melebihi batas " +
+      maxMB +
+      " MB. Untuk video, unggah ke Google Drive/YouTube lalu tempel link-nya.",
+    true,
+  );
+  return false;
 }
