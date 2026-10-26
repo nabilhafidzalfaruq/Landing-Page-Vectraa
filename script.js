@@ -1252,6 +1252,8 @@ async function openAdminSubmission(id) {
         if (v && typeof v === "object" && v.url)
           show = `<a href="${escapeAttr(v.url)}" target="_blank">${escapeHtml(v.fileName || "Buka file")}</a>`;
         else if (typeof v === "boolean") show = v ? "Ya" : "Tidak";
+        else if (typeof v === "string" && /^https?:\/\/\S+$/i.test(v.trim()))
+          show = `<a href="${escapeAttr(v.trim())}" target="_blank" rel="noopener">${escapeHtml(v.trim())}</a>`;
         else show = escapeHtml(String(v ?? ""));
         return `<div class="kv"><span>${escapeHtml(humanize(k))}</span><b>${show || "-"}</b></div>`;
       })
@@ -1300,6 +1302,8 @@ async function openAdminRegistration(id) {
         if (v && typeof v === "object" && v.url)
           show = `<a href="${escapeAttr(v.url)}" target="_blank">${escapeHtml(v.fileName || "Buka file")}</a>`;
         else if (typeof v === "boolean") show = v ? "Ya" : "Tidak";
+        else if (typeof v === "string" && /^https?:\/\/\S+$/i.test(v.trim()))
+          show = `<a href="${escapeAttr(v.trim())}" target="_blank" rel="noopener">${escapeHtml(v.trim())}</a>`;
         else show = escapeHtml(String(v ?? ""));
         return `<div class="kv"><span>${escapeHtml(humanize(k))}</span><b>${show || "-"}</b></div>`;
       })
